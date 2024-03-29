@@ -1,62 +1,34 @@
-version: "3"
-
 services:
-
-  giteaserver:
-    image: gitea/gitea:1.21.4
-    container_name: gitea-server
-    environment:
-      - USER_UID=1000
-      - USER_GID=1000
-      - GITEA__database__DB_TYPE=mysql
-      - GITEA__database__HOST=db:3306
-      - GITEA__database__NAME=gitea
-      - GITEA__database__USER=gitea
-      - GITEA__database__PASSWD=
-    restart: always
-    networks:
-      - gitea
-    volumes:
-      - ./containerdata/gitea_data:/data
-      - /etc/timezone:/etc/timezone:ro
-      - /etc/localtime:/etc/localtime:ro
-    ports:
-      - "3000:3000"
-      - "222:22"
-    depends_on:
-      - mysql
-  
   mysql:
     image: mysql:8
     restart: always
-    container_name: mysql
+    container_name: mysql-server
     environment:
       - MYSQL_ROOT_PASSWORD=
-      - MYSQL_USER=gitea
+      - MYSQL_USER=carlosalmeida
       - MYSQL_PASSWORD=
-      - MYSQL_DATABASE=gitea
     networks:
-      - gitea
+      - infrastructure
     volumes:
-      - ./containerdata/mysql_data:/var/lib/mysql
+      - ./containerdata/mysql:/var/lib/mysql
     ports:
       - "3306:3306"
 
   portainer:
     image: portainer/portainer-ce
-    container_name: portainer
+    container_name: portainer-server
     command: -H unix:///var/run/docker.sock
     ports:
       - "9000:9000"
     networks:
-      - gitea
+      - infrastructure
     volumes:
       - "/var/run/docker.sock:/var/run/docker.sock"
       - "portainer_data:/data"
     restart: always
 
   nginxproxymanager:
-    container_name: nginx-proxy-manager
+    container_name: nginx
     image: 'jc21/nginx-proxy-manager:latest'
     restart: unless-stopped
     ports:
@@ -64,13 +36,40 @@ services:
       - '81:81'
       - '443:443'
     networks:
-      - gitea
+      - infrastructure
     volumes:
-      - ./containerdata/nginx_data:/data
+      - ./containerdata/nginx:/data
       - ./containerdata/letsencrypt:/etc/letsencrypt
 
+  giteaserver:
+    image: gitea/gitea:latest
+    container_name: gitea-server
+    environment:
+      - USER_UID=1000
+      - USER_GID=1000
+      - GITEA__database__DB_TYPE=mysql
+      - GITEA__database__HOST=mysql-server:3306
+      - GITEA__database__NAME=gitea
+      - GITEA__database__USER=gitea_user
+      - GITEA__database__PASSWD=
+    restart: always
+    networks:
+      - infrastructure
+    volumes:
+      - ./containerdata/gitea:/data
+      - /etc/timezone:/etc/timezone:ro
+      - /etc/localtime:/etc/localtime:ro
+    ports:
+      - "3000:3000"
+      - "222:22"
+    depends_on:
+      - mysql
+    security_opt:
+      - no-new-privileges:true
+      
 volumes:
   portainer_data:
 
 networks:
-  gitea:
+  infrastructure:
+    name: infrastructure-network
